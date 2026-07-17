@@ -3,13 +3,15 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Logistics Management Analysis 物流管理分析</title>
+<title>Logistics Analysis Dashboard 物流分析表</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@600;700&family=Noto+Sans+TC:wght@400;500;700;900&family=IBM+Plex+Mono:wght@400;500;600&display=swap" rel="stylesheet">
 <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/chartjs-plugin-datalabels/2.2.0/chartjs-plugin-datalabels.min.js"></script>
 <style>
   :root{
+    --gutter: clamp(14px, 4vw, 32px);
+    --page-max: 1440px;
     --bg:#F2F4F7;
     --card:#FFFFFF;
     --border:#E5E9EF;
@@ -39,12 +41,14 @@
     font-size:15px;
     line-height:1.5;
     min-height:100vh;
+    width:100%;
+    overflow-x:hidden;
     padding-bottom:60px;
   }
   .mono{font-family:'IBM Plex Mono', monospace;}
   a{color:inherit;}
 
-  header{max-width:1180px; margin:0 auto; padding:30px 24px 6px;}
+  header{max-width:var(--page-max); margin:0 auto; padding:30px var(--gutter) 6px;}
   h1.title{
     font-family:'Space Grotesk', sans-serif;
     font-weight:700; font-size:28px; letter-spacing:-0.01em;
@@ -52,7 +56,7 @@
   h1.title .en{color:var(--orange);}
   h1.title .zh{color:var(--navy); font-family:'Noto Sans TC',sans-serif; font-weight:900; margin-left:4px;}
 
-  main{max-width:1180px; margin:0 auto; padding:14px 24px 0;}
+  main{max-width:var(--page-max); margin:0 auto; padding:14px var(--gutter) 0; width:100%; box-sizing:border-box;}
 
   .card{
     background:var(--card); border:1px solid var(--border); border-radius:14px;
@@ -70,6 +74,21 @@
   .dropzone .headline{color:var(--orange); font-weight:700; font-size:16px;}
   .dropzone .sub{color:var(--text-muted); font-size:14px; margin-top:6px;}
   .upload-actions{display:flex; gap:14px; justify-content:center; margin-top:20px; flex-wrap:wrap;}
+
+  .queue-row{
+    display:flex; align-items:center; gap:10px; padding:9px 12px; border:1px solid var(--border);
+    border-radius:8px; background:#FAFBFC; margin-top:8px; flex-wrap:wrap;
+  }
+  .queue-row .fname{flex:1; min-width:160px; font-size:14px; word-break:break-all;}
+  .queue-row select{
+    background:#fff; border:1px solid var(--border); border-radius:6px; padding:6px 8px; font-size:14px;
+  }
+  .queue-row .remove{background:none; border:none; color:var(--text-muted); cursor:pointer; font-size:16px; padding:2px 6px;}
+  .queue-row .remove:hover{color:#E14F4F;}
+  .queue-row .status{font-size:13px; color:var(--text-muted); min-width:70px; text-align:right;}
+  .queue-row .status.ok{color:var(--green); font-weight:600;}
+  .queue-row .status.dup{color:var(--orange); font-weight:600;}
+  .queue-row .status.err{color:#E14F4F; font-weight:600;}
 
   .btn{
     font-family:'Noto Sans TC',sans-serif; font-weight:600; font-size:15px; cursor:pointer;
@@ -128,17 +147,24 @@
   }
   .badge .dot{width:6px; height:6px; border-radius:50%; background:var(--green);}
 
-  footer{max-width:1180px; margin:24px auto 0; padding:0 24px; color:var(--text-muted); font-size:14px;}
+  footer{max-width:var(--page-max); margin:24px auto 0; padding:0 var(--gutter); color:var(--text-muted); font-size:14px;}
+
+  @media (max-width:768px){
+    .stat-row{grid-template-columns:repeat(3,1fr);}
+  }
 
   @media (max-width:640px){
-    header{padding:22px 16px 4px;}
-    main{padding:12px 16px 0;}
-    footer{padding:0 16px;}
-    .card{padding:18px; border-radius:12px;}
-    h1.title{font-size:22px;}
+    header{padding-top:22px; padding-bottom:4px;}
+    main{padding-top:12px;}
+    .card{padding:16px; border-radius:12px;}
+    h1.title{font-size:21px;}
     .upload-actions{flex-direction:column;}
     .upload-actions .btn{width:100%;}
-    .dropzone{padding:26px 14px;}
+    .dropzone{padding:24px 12px;}
+  }
+  @media (max-width:380px){
+    :root{ --gutter: 10px; }
+    .card{padding:14px;}
   }
 </style>
 </head>
@@ -151,13 +177,15 @@
 <main>
 
   <div class="card upload-card">
-    <div class="dropzone">
+    <div class="dropzone" id="dropzone">
       <div class="headline">＋ 將物流 PDF 面單拖曳至此，或點擊選擇檔案</div>
-      <div class="sub">檔案解析後將直接寫入後台，不保留前台暫存明細</div>
+      <div class="sub">可一次選擇多個檔案，系統會先依檔名猜測物流商，上傳前可手動修正</div>
+      <input type="file" id="file-input" accept="application/pdf" multiple hidden>
     </div>
+    <div id="queue-list" style="text-align:left; margin-top:14px;"></div>
     <div class="upload-actions">
-      <button class="btn blue" onclick="mockParse()">開始解析上傳</button>
-      <a href="https://docs.google.com/spreadsheets/d/1TxwaXwCaIQ-ivKNms6PJek4wCnV9dUOXktFTyK1ZKts/edit?gid=0#gid=0" class="btn green-outline"><span class="dot"></span>前往查看 Excel 明細</a>
+      <button class="btn blue" id="parse-btn" onclick="startUpload()">開始解析上傳</button>
+      <a href="#" id="open-sheet-btn-top" class="btn green-outline"><span class="dot"></span>前往查看 Excel 明細</a>
     </div>
   </div>
 
@@ -213,24 +241,9 @@
   </div>
 
   <div class="card" id="excel-detail">
-    <div class="panel-head"><span class="icon">📋</span><h2>Excel 明細對應</h2></div>
-    <div class="table-wrap" style="margin-bottom:20px;">
-      <table>
-        <thead><tr><th>面單辨識欄位</th><th></th><th>Excel 欄位</th><th>狀態</th></tr></thead>
-        <tbody id="mapping-table"></tbody>
-      </table>
-    </div>
-    <div class="table-wrap">
-      <table>
-        <thead>
-          <tr>
-            <th>上傳日期</th><th>物流類型</th><th>訂單編號</th><th>寄件編號</th><th>收件人姓名</th>
-            <th>末三碼</th><th>門市代碼</th><th>門市名稱</th><th>收件地址</th><th>連絡電話</th><th>備註</th>
-          </tr>
-        </thead>
-        <tbody id="preview-table"></tbody>
-      </table>
-    </div>
+    <div class="panel-head"><span class="icon">📋</span><h2>Excel 明細</h2></div>
+    <p style="color:var(--text-muted); font-size:14px; margin-bottom:14px;">明細資料直接以 Google Sheet 為準，不在網頁重複顯示，點下方按鈕開啟原始表單查看。</p>
+    <a href="#" id="open-sheet-btn" class="btn blue" style="display:inline-block; text-decoration:none;">開啟 Excel 明細表單</a>
   </div>
 
 </main>
@@ -243,7 +256,7 @@ Chart.register(ChartDataLabels);
 /* ====== 後端 API 設定 ======
    部署好 Apps Script 網頁應用程式後，把網址貼在這裡（.../exec 結尾）。
    留空字串 = 使用畫面內建的示範假資料，方便還沒串接後端時先看畫面效果。 */
-const API_URL = 'https://script.google.com/macros/s/AKfycbwNPBso8XBS77WA93XqwMA2jE36J5MciJXFub4-BskmgbNuttKCXoaAqBWUhURSTTSa5w/exec';
+const API_URL = 'https://script.google.com/macros/s/AKfycbyfu4kA0njyUu-YnjYHIkDoC_LShAUVn0vKUaxXxCuq5mZLCnHkHRxQbmdpIUYi0qEdIg/exec';
 
 async function apiGet_(params){
   if(!API_URL) return null;
@@ -417,33 +430,122 @@ async function renderTrend(){
   });
 }
 
-/* ---------- Excel 明細對應 ---------- */
-const mapping = [
-  ['上傳日期','上傳日期'], ['物流類型','物流類型'], ['訂單編號','訂單編號'], ['寄件編號','寄件編號'],
-  ['收件人姓名','收件人姓名'], ['末三碼','末三碼'], ['門市代碼','門市代碼'], ['門市名稱','門市名稱'],
-  ['收件地址','收件地址'], ['連絡電話','連絡電話'], ['備註','備註'],
-];
-const mt = document.getElementById('mapping-table');
-mapping.forEach(m=>{
-  mt.insertAdjacentHTML('beforeend', `<tr><td class="mono">${m[0]}</td><td style="color:var(--text-muted)">→</td><td class="mono">${m[1]}</td><td><span class="badge"><span class="dot"></span>已對應</span></td></tr>`);
-});
+/* ---------- Excel 明細連結 ---------- */
+const SHEET_URL = 'https://docs.google.com/spreadsheets/d/1TxwaXwCaIQ-ivKNms6PJek4wCnV9dUOXktFTyK1ZKts/edit?gid=0#gid=0'; // 貼上你的 Google Sheet 網址（例如 https://docs.google.com/spreadsheets/d/xxxx/edit）
+function openSheet(e){
+  e.preventDefault();
+  if(!SHEET_URL){ alert('尚未設定 Excel 表單網址，請在 index.html 的 SHEET_URL 填入 Google Sheet 連結'); return; }
+  window.open(SHEET_URL, '_blank');
+}
+document.getElementById('open-sheet-btn').addEventListener('click', openSheet);
+document.getElementById('open-sheet-btn-top').addEventListener('click', openSheet);
 
-const previewRows = [
-  ['2026-07-16','萊爾富','HL260716A032','LF88213321','陳＊明','321','H203','西屯門市','台中市西屯區...','0912＊＊＊345',''],
-  ['2026-07-16','店到家','SP260716A011','SP99102834','張＊婷','834','SH017','三民門市','高雄市三民區...','0928＊＊＊120',''],
-  ['2026-07-15','HCT','HC260715B087','HC44018','李＊華','018','—','—','新北市板橋區...','0955＊＊＊778','宅配到府'],
-  ['2026-07-15','標準配送','ST260715B102','ST20389','王＊安','389','—','—','台北市大安區...','0966＊＊＊210',''],
+/* ---------- 上傳佇列（拖曳 / 選擇檔案） ---------- */
+const RAW_CARRIER_TYPES = ['統一超商','FamilyMart寄取貨單','Hi-Life 寄取貨單','店到家宅配','HCT','標準配送'];
+const GUESS_RULES = [
+  [/店到家|蝦皮店家/, '店到家宅配'],
+  [/hct/i, 'HCT'],
+  [/萊爾富|hi-?life/i, 'Hi-Life 寄取貨單'],
+  [/全家|family/i, 'FamilyMart寄取貨單'],
+  [/711|7-11|超商|統一/, '統一超商'],
+  [/標準|蝦皮標準/, '標準配送'],
 ];
-const pt = document.getElementById('preview-table');
-previewRows.forEach(r=>{
-  pt.insertAdjacentHTML('beforeend', `<tr>${r.map(c=>`<td class="mono">${c||'—'}</td>`).join('')}</tr>`);
-});
+function guessCarrier_(filename){
+  for(const [re, type] of GUESS_RULES){ if(re.test(filename)) return type; }
+  return '';
+}
 
-function mockParse(){
-  const btn = event.target;
+let queue = []; // {id, file, carrierType}
+let seq = 0;
+
+function addFiles(fileList){
+  Array.from(fileList).forEach(file=>{
+    if(!file.name.toLowerCase().endsWith('.pdf')) return;
+    queue.push({ id: seq++, file, carrierType: guessCarrier_(file.name) });
+  });
+  renderQueue();
+}
+
+function renderQueue(){
+  const el = document.getElementById('queue-list');
+  el.innerHTML = queue.map(q=>`
+    <div class="queue-row" data-id="${q.id}">
+      <span class="fname mono">${q.file.name}</span>
+      <select onchange="setCarrier(${q.id}, this.value)">
+        <option value="" ${!q.carrierType?'selected':''}>請選擇物流商</option>
+        ${RAW_CARRIER_TYPES.map(t=>`<option value="${t}" ${q.carrierType===t?'selected':''}>${CARRIER_NAME_[t]||t}</option>`).join('')}
+      </select>
+      <span class="status" id="qstatus-${q.id}">待上傳</span>
+      <button class="remove" onclick="removeQueue(${q.id})">✕</button>
+    </div>`).join('');
+}
+const CARRIER_NAME_ = {
+  '統一超商':'統一超商（7-11）','FamilyMart寄取貨單':'FamilyMart寄取貨單（全家）','Hi-Life 寄取貨單':'Hi-Life 寄取貨單（萊爾富）',
+  '店到家宅配':'店到家宅配','HCT':'HCT','標準配送':'標準配送'
+};
+function setCarrier(id, val){ const q = queue.find(x=>x.id===id); if(q) q.carrierType = val; }
+function removeQueue(id){ queue = queue.filter(x=>x.id!==id); renderQueue(); }
+
+const dropzone = document.getElementById('dropzone');
+const fileInput = document.getElementById('file-input');
+dropzone.addEventListener('click', ()=> fileInput.click());
+fileInput.addEventListener('change', e=>{ addFiles(e.target.files); fileInput.value=''; });
+['dragover','dragenter'].forEach(evt=> dropzone.addEventListener(evt, e=>{ e.preventDefault(); dropzone.style.background='#FFF3E0'; }));
+['dragleave','drop'].forEach(evt=> dropzone.addEventListener(evt, e=>{ e.preventDefault(); dropzone.style.background=''; }));
+dropzone.addEventListener('drop', e=>{ addFiles(e.dataTransfer.files); });
+
+function fileToBase64_(file){
+  return new Promise((resolve,reject)=>{
+    const reader = new FileReader();
+    reader.onload = ()=> resolve(reader.result.split(',')[1]);
+    reader.onerror = reject;
+    reader.readAsDataURL(file);
+  });
+}
+
+async function startUpload(){
+  if(!API_URL){ alert('尚未設定後端網址（API_URL），請先部署 Apps Script 並填入網址'); return; }
+  if(queue.length===0){ alert('請先加入要上傳的 PDF 檔案'); return; }
+  if(queue.some(q=>!q.carrierType)){ alert('有檔案尚未選擇物流商，請完成選擇後再上傳'); return; }
+
+  const btn = document.getElementById('parse-btn');
   const original = btn.textContent;
-  btn.textContent = '解析中...';
-  setTimeout(()=>{ btn.textContent = original; renderStats(); renderTrend(); }, 700);
+  btn.textContent = '解析上傳中...'; btn.disabled = true;
+  queue.forEach(q=> document.getElementById('qstatus-'+q.id).textContent = '處理中');
+
+  try{
+    const items = await Promise.all(queue.map(async q=>({
+      carrierType: q.carrierType,
+      pdfBase64: await fileToBase64_(q.file)
+    })));
+
+    const res = await fetch(API_URL, {
+      method:'POST',
+      headers:{ 'Content-Type':'text/plain;charset=utf-8' }, // 避免觸發瀏覽器 CORS 預檢請求
+      body: JSON.stringify(items)
+    });
+    const data = await res.json();
+
+    if(!data.success) throw new Error(data.error || '上傳失敗');
+
+    let msg = `上傳完成：新增 ${data.insertedCount} 筆`;
+    if(data.duplicateCount > 0){
+      msg += `，重複略過 ${data.duplicateCount} 筆\n\n重複訂單編號（前5筆）：\n${data.duplicates.first5.join('\n')}`;
+      if(data.duplicates.last5.length){
+        msg += `\n\n重複訂單編號（末5筆）：\n${data.duplicates.last5.join('\n')}`;
+      }
+    }
+    alert(msg);
+
+    queue = [];
+    renderQueue();
+    renderStats();
+    renderTrend();
+  }catch(err){
+    alert('上傳失敗：'+ err.message);
+  }finally{
+    btn.textContent = original; btn.disabled = false;
+  }
 }
 
 /* ---------- init ---------- */
