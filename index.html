@@ -1,0 +1,455 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Logistics Analysis Dashboard 物流分析表</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@600;700&family=Noto+Sans+TC:wght@400;500;700;900&family=IBM+Plex+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/chartjs-plugin-datalabels/2.2.0/chartjs-plugin-datalabels.min.js"></script>
+<style>
+  :root{
+    --bg:#F2F4F7;
+    --card:#FFFFFF;
+    --border:#E5E9EF;
+    --text:#20272F;
+    --text-muted:#7A8494;
+    --orange:#E67E30;
+    --navy:#1F2937;
+    --blue:#2F6FED;
+    --blue-dim:#EAF1FE;
+    --green:#28A867;
+    --green-dim:#E7F7EF;
+
+    --c-711:#3DAA5C;
+    --c-family:#2F8FE0;
+    --c-hilife:#E14F4F;
+    --c-shopee:#F08A34;
+    --c-hct:#F0C24A;
+    --c-standard:#9B59D0;
+    --line:#334155;
+  }
+  *{box-sizing:border-box; margin:0; padding:0;}
+  html{font-size:16px;}
+  body{
+    background:var(--bg);
+    color:var(--text);
+    font-family:'Noto Sans TC', sans-serif;
+    font-size:15px;
+    line-height:1.5;
+    min-height:100vh;
+    padding-bottom:60px;
+  }
+  .mono{font-family:'IBM Plex Mono', monospace;}
+  a{color:inherit;}
+
+  header{max-width:1180px; margin:0 auto; padding:30px 24px 6px;}
+  h1.title{
+    font-family:'Space Grotesk', sans-serif;
+    font-weight:700; font-size:28px; letter-spacing:-0.01em;
+  }
+  h1.title .en{color:var(--orange);}
+  h1.title .zh{color:var(--navy); font-family:'Noto Sans TC',sans-serif; font-weight:900; margin-left:4px;}
+
+  main{max-width:1180px; margin:0 auto; padding:14px 24px 0;}
+
+  .card{
+    background:var(--card); border:1px solid var(--border); border-radius:14px;
+    padding:24px; box-shadow:0 1px 2px rgba(20,30,40,0.03);
+  }
+  .card + .card{margin-top:18px;}
+
+  /* upload card */
+  .upload-card{text-align:center;}
+  .dropzone{
+    border:1.5px dashed #D8A15C; border-radius:12px; padding:34px 20px;
+    background:#FFFCF7; cursor:pointer; transition:.15s;
+  }
+  .dropzone:hover{background:#FFF7EA;}
+  .dropzone .headline{color:var(--orange); font-weight:700; font-size:16px;}
+  .dropzone .sub{color:var(--text-muted); font-size:14px; margin-top:6px;}
+  .upload-actions{display:flex; gap:14px; justify-content:center; margin-top:20px; flex-wrap:wrap;}
+
+  .btn{
+    font-family:'Noto Sans TC',sans-serif; font-weight:600; font-size:15px; cursor:pointer;
+    border-radius:8px; padding:12px 22px; border:none; transition:.15s;
+  }
+  .btn.blue{background:var(--blue); color:#fff;}
+  .btn.blue:hover{filter:brightness(1.06);}
+  .btn.green-outline{background:var(--green-dim); color:var(--green); display:inline-flex; align-items:center; gap:8px;}
+  .btn.green-outline:hover{filter:brightness(0.98);}
+  .btn.green-outline .dot{width:7px; height:7px; border-radius:50%; background:var(--green); display:inline-block;}
+  .btn.small{padding:8px 14px; font-size:14px; background:var(--blue-dim); color:var(--blue); font-weight:500;}
+
+  /* two-column analysis */
+  .grid-2{display:grid; grid-template-columns:1fr 1fr; gap:18px; margin-top:18px;}
+  @media (max-width:900px){.grid-2{grid-template-columns:1fr;}}
+
+  .panel-head{display:flex; align-items:center; gap:8px; margin-bottom:16px;}
+  .panel-head .icon{
+    width:26px; height:26px; border-radius:6px; display:flex; align-items:center; justify-content:center;
+    background:var(--blue-dim); color:var(--blue); font-size:14px; flex-shrink:0;
+  }
+  .panel-head h2{font-size:17px; font-weight:700;}
+
+  .filter-row{display:flex; gap:14px; flex-wrap:wrap; margin-bottom:18px;}
+  .field{display:flex; flex-direction:column; gap:6px; flex:1; min-width:150px;}
+  .field label{font-size:14px; color:var(--text-muted); font-weight:500;}
+  .field input, .field select{
+    background:#fff; border:1px solid var(--border); color:var(--text);
+    padding:10px 10px; border-radius:7px; font-family:'Noto Sans TC',sans-serif; font-size:15px;
+  }
+
+  .stat-row{display:grid; grid-template-columns:repeat(6,1fr); gap:10px; margin-bottom:18px;}
+  @media (max-width:520px){.stat-row{grid-template-columns:repeat(3,1fr);}}
+  .stat{
+    background:#FAFBFC; border:1px solid var(--border); border-radius:10px; padding:12px 6px;
+    text-align:center;
+  }
+  .stat .name{font-size:14px; color:var(--text-muted); margin-bottom:4px;}
+  .stat .val{font-family:'IBM Plex Mono',monospace; font-size:20px; font-weight:700; color:var(--c);}
+
+  .range-label{font-size:14px; color:var(--text-muted); margin:-6px 0 14px;}
+
+  canvas{max-width:100%;}
+
+  .table-wrap{overflow-x:auto; -webkit-overflow-scrolling:touch;}
+  table{width:100%; min-width:640px; border-collapse:collapse; font-size:14px;}
+  th{
+    text-align:left; font-size:14px; font-weight:600; color:var(--text-muted);
+    padding:10px 10px; border-bottom:1px solid var(--border); background:#FAFBFC; white-space:nowrap;
+  }
+  td{padding:11px 10px; border-bottom:1px solid #F0F2F5; white-space:nowrap;}
+  tr:last-child td{border-bottom:none;}
+  .badge{
+    display:inline-flex; align-items:center; gap:6px; font-size:14px; font-weight:600;
+    padding:4px 10px; border-radius:20px; background:var(--green-dim); color:var(--green);
+  }
+  .badge .dot{width:6px; height:6px; border-radius:50%; background:var(--green);}
+
+  footer{max-width:1180px; margin:24px auto 0; padding:0 24px; color:var(--text-muted); font-size:14px;}
+
+  @media (max-width:640px){
+    header{padding:22px 16px 4px;}
+    main{padding:12px 16px 0;}
+    footer{padding:0 16px;}
+    .card{padding:18px; border-radius:12px;}
+    h1.title{font-size:22px;}
+    .upload-actions{flex-direction:column;}
+    .upload-actions .btn{width:100%;}
+    .dropzone{padding:26px 14px;}
+  }
+</style>
+</head>
+<body>
+
+<header>
+  <h1 class="title"><span class="en">Logistics Analysis</span> <span class="zh">Dashboard 物流分析表</span></h1>
+</header>
+
+<main>
+
+  <div class="card upload-card">
+    <div class="dropzone">
+      <div class="headline">＋ 將物流 PDF 面單拖曳至此，或點擊選擇檔案</div>
+      <div class="sub">檔案解析後將直接寫入後台，不保留前台暫存明細</div>
+    </div>
+    <div class="upload-actions">
+      <button class="btn blue" onclick="mockParse()">開始解析上傳</button>
+      <a href="#excel-detail" class="btn green-outline"><span class="dot"></span>前往查看 Excel 明細</a>
+    </div>
+  </div>
+
+  <div class="grid-2">
+    <!-- 分析欄位1 -->
+    <div class="card">
+      <div class="panel-head"><span class="icon">📊</span><h2>物流分佈統計</h2></div>
+      <div class="filter-row">
+        <div class="field"><label>開始日期</label><input type="date" id="stat-start" value="2026-06-16"></div>
+        <div class="field"><label>結束日期</label><input type="date" id="stat-end" value="2026-07-16"></div>
+      </div>
+      <div class="stat-row" id="stat-grid"></div>
+      <p class="range-label" id="stat-range-label"></p>
+      <canvas id="statChart" height="180"></canvas>
+    </div>
+
+    <!-- 分析欄位2 -->
+    <div class="card">
+      <div class="panel-head"><span class="icon">📈</span><h2>營運趨勢分析</h2></div>
+      <div class="filter-row">
+        <div class="field">
+          <label>時間單位</label>
+          <select id="trend-unit" onchange="onUnitChange()">
+            <option value="day">按日分析（最多31天）</option>
+            <option value="month">按月分析</option>
+          </select>
+        </div>
+        <div class="field">
+          <label id="trend-range-label">選擇日期區間</label>
+          <div style="display:flex; gap:6px;">
+            <input type="date" id="trend-start" value="2026-07-09">
+            <input type="date" id="trend-end" value="2026-07-16">
+          </div>
+        </div>
+      </div>
+      <div class="filter-row" style="margin-bottom:8px;">
+        <div class="field">
+          <label>物流管道</label>
+          <select id="trend-carrier">
+            <option value="all">全部物流</option>
+            <option value="711">7-11</option>
+            <option value="family">全家</option>
+            <option value="hilife">萊爾富</option>
+            <option value="shopee">店到家</option>
+            <option value="hct">HCT</option>
+            <option value="standard">標準配送</option>
+          </select>
+        </div>
+      </div>
+      <p class="range-label" id="trend-range-label-text"></p>
+      <canvas id="trendChart" height="180"></canvas>
+    </div>
+  </div>
+
+  <div class="card" id="excel-detail">
+    <div class="panel-head"><span class="icon">📋</span><h2>Excel 明細對應</h2></div>
+    <div class="table-wrap" style="margin-bottom:20px;">
+      <table>
+        <thead><tr><th>面單辨識欄位</th><th></th><th>Excel 欄位</th><th>狀態</th></tr></thead>
+        <tbody id="mapping-table"></tbody>
+      </table>
+    </div>
+    <div class="table-wrap">
+      <table>
+        <thead>
+          <tr>
+            <th>上傳日期</th><th>物流類型</th><th>訂單編號</th><th>寄件編號</th><th>收件人姓名</th>
+            <th>末三碼</th><th>門市代碼</th><th>門市名稱</th><th>收件地址</th><th>連絡電話</th><th>備註</th>
+          </tr>
+        </thead>
+        <tbody id="preview-table"></tbody>
+      </table>
+    </div>
+  </div>
+
+</main>
+
+<footer>Prototype demo · 資料為示範用假資料，尚未串接 Apps Script / Google Sheets 後端</footer>
+
+<script>
+Chart.register(ChartDataLabels);
+
+/* ====== 後端 API 設定 ======
+   部署好 Apps Script 網頁應用程式後，把網址貼在這裡（.../exec 結尾）。
+   留空字串 = 使用畫面內建的示範假資料，方便還沒串接後端時先看畫面效果。 */
+const API_URL = '';
+
+async function apiGet_(params){
+  if(!API_URL) return null;
+  try{
+    const qs = new URLSearchParams(params).toString();
+    const res = await fetch(`${API_URL}?${qs}`);
+    if(!res.ok) throw new Error('HTTP '+res.status);
+    return await res.json();
+  }catch(err){
+    console.warn('API 讀取失敗，改用示範資料', err);
+    return null;
+  }
+}
+
+const CARRIERS = [
+  {key:'711',      name:'7-11',     color:'#3DAA5C'},
+  {key:'family',   name:'全家',     color:'#2F8FE0'},
+  {key:'hilife',   name:'萊爾富',   color:'#E14F4F'},
+  {key:'shopee',   name:'店到家',   color:'#F08A34'},
+  {key:'hct',      name:'HCT',      color:'#F0C24A'},
+  {key:'standard', name:'標準配送', color:'#9B59D0'},
+];
+
+/* ---------- mock data helpers ---------- */
+function seededRandom(seed){ let s=seed; return ()=>{ s = (s*9301+49297)%233280; return s/233280; }; }
+function dailyCounts(dateStr, key){
+  const seed = Number(dateStr.split('-').join('')) + key.length*97;
+  const rnd = seededRandom(seed);
+  const base = {'711':4,'family':4,'hilife':5,'shopee':6,'hct':9,'standard':10}[key] || 5;
+  return Math.max(0, Math.round(base + (rnd()-0.5)*base*0.8));
+}
+function pad(n){ return String(n).padStart(2,'0'); }
+function daysBetween(start,end){
+  const days=[]; let d=new Date(start+'T00:00:00'); const e=new Date(end+'T00:00:00');
+  while(d<=e){ days.push(d.toISOString().slice(0,10)); d.setDate(d.getDate()+1); }
+  return days;
+}
+function monthsBetween(startYm, endYm){
+  const out=[]; let [sy,sm]=startYm.split('-').map(Number); const [ey,em]=endYm.split('-').map(Number);
+  while(sy<ey || (sy===ey && sm<=em)){ out.push(`${sy}-${pad(sm)}`); sm++; if(sm>12){sm=1; sy++;} }
+  return out;
+}
+function daysInMonth(ym){ const [y,m]=ym.split('-').map(Number); return new Date(y,m,0).getDate(); }
+function sumForDate(d, carrierSel){
+  if(carrierSel==='all') return CARRIERS.reduce((s,c)=> s+dailyCounts(d,c.key),0);
+  return dailyCounts(d, carrierSel);
+}
+
+/* ---------- 分析欄位1：物流分佈統計 ---------- */
+let statChart;
+async function renderStats(){
+  const start = document.getElementById('stat-start').value;
+  const end = document.getElementById('stat-end').value;
+
+  const apiData = await apiGet_({action:'stats', start, end});
+  let totals;
+  if(apiData && apiData.counts){
+    totals = CARRIERS.map(c=> apiData.counts[c.name] || 0);
+  } else {
+    const days = daysBetween(start,end);
+    totals = CARRIERS.map(c=> days.reduce((sum,d)=> sum + dailyCounts(d,c.key), 0));
+  }
+  document.getElementById('stat-range-label').textContent = `區間：${start} ～ ${end}`;
+
+  const grid = document.getElementById('stat-grid');
+  grid.innerHTML = '';
+  CARRIERS.forEach((c,i)=>{
+    grid.insertAdjacentHTML('beforeend', `
+      <div class="stat" style="--c:${c.color}">
+        <div class="name">${c.name}</div>
+        <div class="val">${totals[i]}</div>
+      </div>`);
+  });
+
+  if(statChart) statChart.destroy();
+  statChart = new Chart(document.getElementById('statChart'), {
+    type:'bar',
+    data:{ labels: CARRIERS.map(c=>c.name), datasets:[{ data: totals, backgroundColor: CARRIERS.map(c=>c.color), borderRadius:6, maxBarThickness:52 }] },
+    options:{
+      responsive:true,
+      plugins:{
+        legend:{display:false},
+        tooltip:{enabled:false},
+        datalabels:{ anchor:'end', align:'top', color:'#7A8494', font:{size:12.5, family:"'IBM Plex Mono'"}, formatter:v=>v+'件' }
+      },
+      layout:{padding:{top:16}},
+      scales:{
+        x:{ grid:{display:false}, ticks:{color:'#4B5563', font:{family:"'Noto Sans TC'", size:13}} },
+        y:{ display:false, grid:{display:false} }
+      }
+    }
+  });
+}
+
+/* ---------- 分析欄位2：出貨趨勢追蹤 ---------- */
+function onUnitChange(){
+  const mode = document.getElementById('trend-unit').value;
+  const s = document.getElementById('trend-start');
+  const e = document.getElementById('trend-end');
+  document.getElementById('trend-range-label').textContent = mode==='day' ? '選擇日期區間' : '選擇月份區間';
+  if(mode==='day'){
+    s.type='date'; e.type='date';
+    if(!/^\d{4}-\d{2}-\d{2}$/.test(s.value)){ s.value='2026-07-09'; e.value='2026-07-16'; }
+  } else {
+    s.type='month'; e.type='month';
+    if(!/^\d{4}-\d{2}$/.test(s.value)){ s.value='2026-01'; e.value='2026-06'; }
+  }
+}
+
+let trendChart;
+async function renderTrend(){
+  const mode = document.getElementById('trend-unit').value;
+  const carrierSel = document.getElementById('trend-carrier').value;
+  const start = document.getElementById('trend-start').value;
+  const end = document.getElementById('trend-end').value;
+
+  let labels, values, rangeText;
+  const carrierName = carrierSel==='all' ? '全部物流' : CARRIERS.find(c=>c.key===carrierSel).name;
+
+  const apiData = await apiGet_({action:'trend', mode, start, end, carrier: carrierSel==='all' ? 'all' : carrierName});
+
+  if(apiData && apiData.labels){
+    labels = apiData.labels;
+    values = apiData.values;
+    rangeText = mode==='day'
+      ? `區間：${start} ～ ${end}　·　${carrierName}`
+      : `區間：${start} ～ ${end}　·　${carrierName}`;
+  } else if(mode==='day'){
+    const days = daysBetween(start, end);
+    labels = days.map(d=> d.slice(5));
+    values = days.map(d=> sumForDate(d, carrierSel));
+    rangeText = `區間：${start} ～ ${end}　·　${carrierName}`;
+  } else {
+    if(start===end){
+      const ym = start; const n = daysInMonth(ym);
+      const days = Array.from({length:n},(_,i)=>`${ym}-${pad(i+1)}`);
+      labels = days.map(d=>d.slice(5));
+      values = days.map(d=>sumForDate(d, carrierSel));
+      rangeText = `月份：${ym}（依日拆解，共 ${n} 天）　·　${carrierName}`;
+    } else {
+      const months = monthsBetween(start,end);
+      labels = months;
+      values = months.map(ym=>{
+        const days = Array.from({length:daysInMonth(ym)},(_,i)=>`${ym}-${pad(i+1)}`);
+        return days.reduce((s,d)=>s+sumForDate(d, carrierSel),0);
+      });
+      rangeText = `區間：${start} ～ ${end}（月總計）　·　${carrierName}`;
+    }
+  }
+  document.getElementById('trend-range-label-text').textContent = rangeText;
+
+  const color = carrierSel==='all' ? '#334155' : CARRIERS.find(c=>c.key===carrierSel).color;
+
+  if(trendChart) trendChart.destroy();
+  trendChart = new Chart(document.getElementById('trendChart'), {
+    type:'line',
+    data:{ labels, datasets:[{ data: values, borderColor:color, backgroundColor:color+'14', pointBackgroundColor:'#fff', pointBorderColor:color, pointBorderWidth:2, pointRadius:4, tension:.35, borderWidth:2.5, fill:true }] },
+    options:{
+      responsive:true,
+      plugins:{
+        legend:{display:false},
+        tooltip:{enabled:false},
+        datalabels:{ anchor:'end', align:'top', color:'#7A8494', font:{size:12.5, family:"'IBM Plex Mono'"}, formatter:v=>v }
+      },
+      layout:{padding:{top:16}},
+      scales:{
+        x:{ grid:{display:false}, ticks:{color:'#7A8494', maxRotation:0, autoSkip:true, font:{family:"'IBM Plex Mono'", size:12}} },
+        y:{ display:false, grid:{display:false} }
+      }
+    }
+  });
+}
+
+/* ---------- Excel 明細對應 ---------- */
+const mapping = [
+  ['上傳日期','上傳日期'], ['物流類型','物流類型'], ['訂單編號','訂單編號'], ['寄件編號','寄件編號'],
+  ['收件人姓名','收件人姓名'], ['末三碼','末三碼'], ['門市代碼','門市代碼'], ['門市名稱','門市名稱'],
+  ['收件地址','收件地址'], ['連絡電話','連絡電話'], ['備註','備註'],
+];
+const mt = document.getElementById('mapping-table');
+mapping.forEach(m=>{
+  mt.insertAdjacentHTML('beforeend', `<tr><td class="mono">${m[0]}</td><td style="color:var(--text-muted)">→</td><td class="mono">${m[1]}</td><td><span class="badge"><span class="dot"></span>已對應</span></td></tr>`);
+});
+
+const previewRows = [
+  ['2026-07-16','萊爾富','HL260716A032','LF88213321','陳＊明','321','H203','西屯門市','台中市西屯區...','0912＊＊＊345',''],
+  ['2026-07-16','店到家','SP260716A011','SP99102834','張＊婷','834','SH017','三民門市','高雄市三民區...','0928＊＊＊120',''],
+  ['2026-07-15','HCT','HC260715B087','HC44018','李＊華','018','—','—','新北市板橋區...','0955＊＊＊778','宅配到府'],
+  ['2026-07-15','標準配送','ST260715B102','ST20389','王＊安','389','—','—','台北市大安區...','0966＊＊＊210',''],
+];
+const pt = document.getElementById('preview-table');
+previewRows.forEach(r=>{
+  pt.insertAdjacentHTML('beforeend', `<tr>${r.map(c=>`<td class="mono">${c||'—'}</td>`).join('')}</tr>`);
+});
+
+function mockParse(){
+  const btn = event.target;
+  const original = btn.textContent;
+  btn.textContent = '解析中...';
+  setTimeout(()=>{ btn.textContent = original; renderStats(); renderTrend(); }, 700);
+}
+
+/* ---------- init ---------- */
+onUnitChange();
+renderStats();
+renderTrend();
+</script>
+</body>
+</html>
