@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Logistics Analysis Dashboard 物流分析表</title>
+<title>Logistics Management Analysis 物流管理分析</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@600;700&family=Noto+Sans+TC:wght@400;500;700;900&family=IBM+Plex+Mono:wght@400;500;600&display=swap" rel="stylesheet">
 <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
@@ -157,7 +157,7 @@
     </div>
     <div class="upload-actions">
       <button class="btn blue" onclick="mockParse()">開始解析上傳</button>
-      <a href="#excel-detail" class="btn green-outline"><span class="dot"></span>前往查看 Excel 明細</a>
+      <a href="https://docs.google.com/spreadsheets/d/1TxwaXwCaIQ-ivKNms6PJek4wCnV9dUOXktFTyK1ZKts/edit?gid=0#gid=0" class="btn green-outline"><span class="dot"></span>前往查看 Excel 明細</a>
     </div>
   </div>
 
@@ -243,7 +243,7 @@ Chart.register(ChartDataLabels);
 /* ====== 後端 API 設定 ======
    部署好 Apps Script 網頁應用程式後，把網址貼在這裡（.../exec 結尾）。
    留空字串 = 使用畫面內建的示範假資料，方便還沒串接後端時先看畫面效果。 */
-const API_URL = '';
+const API_URL = 'https://script.google.com/macros/s/AKfycbwNPBso8XBS77WA93XqwMA2jE36J5MciJXFub4-BskmgbNuttKCXoaAqBWUhURSTTSa5w/exec';
 
 async function apiGet_(params){
   if(!API_URL) return null;
