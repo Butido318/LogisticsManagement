@@ -551,8 +551,9 @@ async function startUpload(){
     const anomalies = [...totals.needsReview, ...totals.failed]; // 無法判斷物流商 + 其他解析失敗，合併當作「異常」處理
     if(anomalies.length){
       const truncName = f => f.slice(0,14);
-      const first5 = anomalies.slice(0,5).map(r=>truncName(r.filename));
-      const last5 = anomalies.length>5 ? anomalies.slice(-5).map(r=>truncName(r.filename)) : [];
+      const fmt = r => `${truncName(r.filename)}：${r.reason || '未知原因'}`;
+      const first5 = anomalies.slice(0,5).map(fmt);
+      const last5 = anomalies.length>5 ? anomalies.slice(-5).map(fmt) : [];
       msg += `\n\n⚠️ ${anomalies.length} 筆無法判斷物流商或解析失敗\n前5筆檔名：\n${first5.join('\n')}`;
       if(last5.length) msg += `\n末5筆檔名：\n${last5.join('\n')}`;
       msg += `\n\n按「確定」= 排除這 ${anomalies.length} 筆，保留其餘上傳結果\n按「取消」= 整批（含已成功的）重新排入佇列，稍後重新上傳整批（已成功寫入的會自動被判定重複而略過，不會重複寫入）`;
