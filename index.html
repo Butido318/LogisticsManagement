@@ -496,7 +496,7 @@ function fileToBase64_(file){
   });
 }
 
-const BATCH_SIZE = 30; // 每次送給後端的檔案數，避免單次執行超過 Apps Script 6 分鐘限制
+const BATCH_SIZE = 15; // 每次送給後端的檔案數；因為加了 OCR 流量限制的重試機制，單筆處理時間變長，調低批次數以確保不超過 Apps Script 6 分鐘限制
 
 async function startUpload(){
   if(!API_URL){ alert('尚未設定後端網址（API_URL），請先部署 Apps Script 並填入網址'); return; }
