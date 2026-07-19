@@ -196,6 +196,7 @@
       <div class="filter-row">
         <div class="field"><label>開始日期</label><input type="date" id="stat-start" value="2026-06-16"></div>
         <div class="field"><label>結束日期</label><input type="date" id="stat-end" value="2026-07-16"></div>
+        <div class="field"><label>&nbsp;</label><button class="btn blue" onclick="renderStats()">套用篩選</button></div>
       </div>
       <div class="stat-row" id="stat-grid"></div>
       <p class="range-label" id="stat-range-label"></p>
@@ -234,6 +235,7 @@
             <option value="standard">標準配送</option>
           </select>
         </div>
+        <div class="field"><label>&nbsp;</label><button class="btn blue" onclick="renderTrend()">套用篩選</button></div>
       </div>
       <p class="range-label" id="trend-range-label-text"></p>
       <canvas id="trendChart" height="180"></canvas>
