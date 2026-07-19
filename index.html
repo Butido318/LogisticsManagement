@@ -194,8 +194,8 @@
     <div class="card">
       <div class="panel-head"><span class="icon">📊</span><h2>物流分佈統計</h2></div>
       <div class="filter-row">
-        <div class="field"><label>開始日期</label><input type="date" id="stat-start" value="2026-06-16"></div>
-        <div class="field"><label>結束日期</label><input type="date" id="stat-end" value="2026-07-16"></div>
+        <div class="field"><label>開始日期</label><input type="date" id="stat-start"></div>
+        <div class="field"><label>結束日期</label><input type="date" id="stat-end"></div>
         <div class="field"><label>&nbsp;</label><button class="btn blue" onclick="renderStats()">套用篩選</button></div>
       </div>
       <div class="stat-row" id="stat-grid"></div>
@@ -211,16 +211,17 @@
           <label>時間單位</label>
           <select id="trend-unit" onchange="onUnitChange()">
             <option value="day">按日分析（最多31天）</option>
-            <option value="month">按月分析</option>
+            <option value="month" selected>按月分析</option>
           </select>
         </div>
         <div class="field">
-          <label id="trend-range-label">選擇日期區間</label>
+          <label id="trend-range-label">選擇月份區間</label>
           <div style="display:flex; gap:6px;">
-            <input type="date" id="trend-start" value="2026-07-09">
-            <input type="date" id="trend-end" value="2026-07-16">
+            <input type="month" id="trend-start">
+            <input type="month" id="trend-end">
           </div>
         </div>
+      </div>
       </div>
       <div class="filter-row" style="margin-bottom:8px;">
         <div class="field">
@@ -353,18 +354,33 @@ async function renderStats(){
   });
 }
 
+/* ---------- 日期輔助函式 ---------- */
+function pad2_(n){ return String(n).padStart(2,'0'); }
+function toDateStr_(d){ return `${d.getFullYear()}-${pad2_(d.getMonth()+1)}-${pad2_(d.getDate())}`; }
+function toMonthStr_(d){ return `${d.getFullYear()}-${pad2_(d.getMonth()+1)}`; }
+function addDays_(d, n){ const r = new Date(d); r.setDate(r.getDate()+n); return r; }
+function addMonths_(d, n){ const r = new Date(d.getFullYear(), d.getMonth()+n, 1); return r; }
+function startOfMonth_(d){ return new Date(d.getFullYear(), d.getMonth(), 1); }
+
 /* ---------- 分析欄位2：出貨趨勢追蹤 ---------- */
 function onUnitChange(){
   const mode = document.getElementById('trend-unit').value;
   const s = document.getElementById('trend-start');
   const e = document.getElementById('trend-end');
+  const today = new Date();
   document.getElementById('trend-range-label').textContent = mode==='day' ? '選擇日期區間' : '選擇月份區間';
   if(mode==='day'){
     s.type='date'; e.type='date';
-    if(!/^\d{4}-\d{2}-\d{2}$/.test(s.value)){ s.value='2026-07-09'; e.value='2026-07-16'; }
+    if(!/^\d{4}-\d{2}-\d{2}$/.test(s.value)){
+      s.value = toDateStr_(addDays_(today, -30)); // 預設今天往前30天
+      e.value = toDateStr_(today); // 預設今天
+    }
   } else {
     s.type='month'; e.type='month';
-    if(!/^\d{4}-\d{2}$/.test(s.value)){ s.value='2026-01'; e.value='2026-06'; }
+    if(!/^\d{4}-\d{2}$/.test(s.value)){
+      s.value = toMonthStr_(addMonths_(today, -3)); // 預設當月往前3個月
+      e.value = toMonthStr_(today); // 預設當月
+    }
   }
 }
 
@@ -583,6 +599,11 @@ async function startUpload(){
 }
 
 /* ---------- init ---------- */
+(function initDefaults_(){
+  const today = new Date();
+  document.getElementById('stat-start').value = toDateStr_(startOfMonth_(today)); // 預設當月1號
+  document.getElementById('stat-end').value = toDateStr_(today); // 預設今天
+})();
 onUnitChange();
 renderStats();
 renderTrend();
