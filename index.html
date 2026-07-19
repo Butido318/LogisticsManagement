@@ -431,7 +431,7 @@ async function renderTrend(){
 }
 
 /* ---------- Excel 明細連結 ---------- */
-const SHEET_URL = 'https://docs.google.com/spreadsheets/d/1TxwaXwCaIQ-ivKNms6PJek4wCnV9dUOXktFTyK1ZKts/edit?gid=0#gid=0'; // 貼上你的 Google Sheet 網址（例如 https://docs.google.com/spreadsheets/d/xxxx/edit）
+const SHEET_URL = 'https://docs.google.com/spreadsheets/d/1TxwaXwCaIQ-ivKNms6PJek4wCnV9dUOXktFTyK1ZKts/edit?gid=549650849#gid=549650849'; // 貼上你的 Google Sheet 網址（例如 https://docs.google.com/spreadsheets/d/xxxx/edit）
 function openSheet(e){
   e.preventDefault();
   if(!SHEET_URL){ alert('尚未設定 Excel 表單網址，請在 index.html 的 SHEET_URL 填入 Google Sheet 連結'); return; }
@@ -441,50 +441,43 @@ document.getElementById('open-sheet-btn').addEventListener('click', openSheet);
 document.getElementById('open-sheet-btn-top').addEventListener('click', openSheet);
 
 /* ---------- 上傳佇列（拖曳 / 選擇檔案） ---------- */
-const RAW_CARRIER_TYPES = ['統一超商','FamilyMart寄取貨單','Hi-Life 寄取貨單','店到家宅配','HCT','標準配送'];
-const GUESS_RULES = [
-  [/店到家|蝦皮店家/, '店到家宅配'],
-  [/hct/i, 'HCT'],
-  [/萊爾富|hi-?life/i, 'Hi-Life 寄取貨單'],
-  [/全家|family/i, 'FamilyMart寄取貨單'],
-  [/711|7-11|超商|統一/, '統一超商'],
-  [/標準|蝦皮標準/, '標準配送'],
-];
-function guessCarrier_(filename){
-  for(const [re, type] of GUESS_RULES){ if(re.test(filename)) return type; }
-  return '';
-}
 
-let queue = []; // {id, file, carrierType}
+const QUEUE_LIST_THRESHOLD = 20; // 檔案數在這個數字以下才逐筆列出，超過只顯示總數摘要（2000 筆逐筆渲染會很卡）
+
+let queue = []; // {id, file}
 let seq = 0;
 
 function addFiles(fileList){
   Array.from(fileList).forEach(file=>{
     if(!file.name.toLowerCase().endsWith('.pdf')) return;
-    queue.push({ id: seq++, file, carrierType: guessCarrier_(file.name) });
+    // 物流商一律「自動判斷」，交給後端依 PDF 實際內容判斷（不用檔名猜，不會被誤判的檔名誤導）
+    queue.push({ id: seq++, file });
   });
   renderQueue();
 }
 
 function renderQueue(){
   const el = document.getElementById('queue-list');
+  if(queue.length === 0){ el.innerHTML = ''; return; }
+
+  if(queue.length > QUEUE_LIST_THRESHOLD){
+    el.innerHTML = `
+      <div class="queue-row">
+        <span class="fname">已加入 <b>${queue.length}</b> 個檔案（物流商將依 PDF 內容自動判斷，數量較多不逐筆列出）</span>
+        <button class="remove" onclick="clearQueue()" style="font-size:13px;">清空全部</button>
+      </div>`;
+    return;
+  }
+
   el.innerHTML = queue.map(q=>`
     <div class="queue-row" data-id="${q.id}">
       <span class="fname mono">${q.file.name}</span>
-      <select onchange="setCarrier(${q.id}, this.value)">
-        <option value="" ${!q.carrierType?'selected':''}>請選擇物流商</option>
-        ${RAW_CARRIER_TYPES.map(t=>`<option value="${t}" ${q.carrierType===t?'selected':''}>${CARRIER_NAME_[t]||t}</option>`).join('')}
-      </select>
       <span class="status" id="qstatus-${q.id}">待上傳</span>
       <button class="remove" onclick="removeQueue(${q.id})">✕</button>
     </div>`).join('');
 }
-const CARRIER_NAME_ = {
-  '統一超商':'統一超商（7-11）','FamilyMart寄取貨單':'FamilyMart寄取貨單（全家）','Hi-Life 寄取貨單':'Hi-Life 寄取貨單（萊爾富）',
-  '店到家宅配':'店到家宅配','HCT':'HCT','標準配送':'標準配送'
-};
-function setCarrier(id, val){ const q = queue.find(x=>x.id===id); if(q) q.carrierType = val; }
 function removeQueue(id){ queue = queue.filter(x=>x.id!==id); renderQueue(); }
+function clearQueue(){ queue = []; renderQueue(); }
 
 const dropzone = document.getElementById('dropzone');
 const fileInput = document.getElementById('file-input');
@@ -503,46 +496,83 @@ function fileToBase64_(file){
   });
 }
 
+const BATCH_SIZE = 30; // 每次送給後端的檔案數，避免單次執行超過 Apps Script 6 分鐘限制
+
 async function startUpload(){
   if(!API_URL){ alert('尚未設定後端網址（API_URL），請先部署 Apps Script 並填入網址'); return; }
   if(queue.length===0){ alert('請先加入要上傳的 PDF 檔案'); return; }
-  if(queue.some(q=>!q.carrierType)){ alert('有檔案尚未選擇物流商，請完成選擇後再上傳'); return; }
 
   const btn = document.getElementById('parse-btn');
   const original = btn.textContent;
-  btn.textContent = '解析上傳中...'; btn.disabled = true;
-  queue.forEach(q=> document.getElementById('qstatus-'+q.id).textContent = '處理中');
+  btn.disabled = true;
+  const currentQueue = queue;
+  currentQueue.forEach(q=> { const el = document.getElementById('qstatus-'+q.id); if(el) el.textContent = '排隊中'; });
+
+  const totals = { inserted:0, duplicateCount:0, duplicates:[], needsReview:[], failed:[] };
+  const chunks = [];
+  for(let i=0;i<currentQueue.length;i+=BATCH_SIZE) chunks.push(currentQueue.slice(i,i+BATCH_SIZE));
 
   try{
-    const items = await Promise.all(queue.map(async q=>({
-      carrierType: q.carrierType,
-      pdfBase64: await fileToBase64_(q.file)
-    })));
+    for(let c=0; c<chunks.length; c++){
+      const chunk = chunks[c];
+      btn.textContent = `解析上傳中...（${Math.min((c+1)*BATCH_SIZE, currentQueue.length)}/${currentQueue.length}）`;
+      chunk.forEach(q=> { const el = document.getElementById('qstatus-'+q.id); if(el) el.textContent = '處理中'; });
 
-    const res = await fetch(API_URL, {
-      method:'POST',
-      headers:{ 'Content-Type':'text/plain;charset=utf-8' }, // 避免觸發瀏覽器 CORS 預檢請求
-      body: JSON.stringify(items)
-    });
-    const data = await res.json();
+      const items = await Promise.all(chunk.map(async q=>({
+        carrierType: 'auto',
+        filename: q.file.name,
+        pdfBase64: await fileToBase64_(q.file)
+      })));
 
-    if(!data.success) throw new Error(data.error || '上傳失敗');
+      const res = await fetch(API_URL, {
+        method:'POST',
+        headers:{ 'Content-Type':'text/plain;charset=utf-8' }, // 避免觸發瀏覽器 CORS 預檢請求
+        body: JSON.stringify(items)
+      });
+      const data = await res.json();
+      if(!data.success) throw new Error(`第 ${c+1}/${chunks.length} 批上傳失敗：${data.error || '未知錯誤'}`);
 
-    let msg = `上傳完成：新增 ${data.insertedCount} 筆`;
-    if(data.duplicateCount > 0){
-      msg += `，重複略過 ${data.duplicateCount} 筆\n\n重複訂單編號（前5筆）：\n${data.duplicates.first5.join('\n')}`;
-      if(data.duplicates.last5.length){
-        msg += `\n\n重複訂單編號（末5筆）：\n${data.duplicates.last5.join('\n')}`;
+      totals.inserted += data.insertedCount;
+      totals.duplicateCount += data.duplicateCount;
+      totals.duplicates.push(...(data.duplicates?.first5 || []), ...(data.duplicates?.last5 || []));
+      totals.needsReview.push(...(data.needsReview || []));
+      totals.failed.push(...(data.failed || []));
+    }
+
+    let msg = `全部上傳完成：新增 ${totals.inserted} 筆`;
+    if(totals.duplicateCount > 0){
+      const dupSorted = totals.duplicates;
+      msg += `，重複略過 ${totals.duplicateCount} 筆\n\n重複訂單編號（前5筆）：\n${dupSorted.slice(0,5).join('\n')}`;
+      if(dupSorted.length>5){
+        msg += `\n\n重複訂單編號（末5筆）：\n${dupSorted.slice(-5).join('\n')}`;
       }
     }
-    alert(msg);
 
-    queue = [];
+    const anomalies = [...totals.needsReview, ...totals.failed]; // 無法判斷物流商 + 其他解析失敗，合併當作「異常」處理
+    if(anomalies.length){
+      const truncName = f => f.slice(0,14);
+      const first5 = anomalies.slice(0,5).map(r=>truncName(r.filename));
+      const last5 = anomalies.length>5 ? anomalies.slice(-5).map(r=>truncName(r.filename)) : [];
+      msg += `\n\n⚠️ ${anomalies.length} 筆無法判斷物流商或解析失敗\n前5筆檔名：\n${first5.join('\n')}`;
+      if(last5.length) msg += `\n末5筆檔名：\n${last5.join('\n')}`;
+      msg += `\n\n按「確定」= 排除這 ${anomalies.length} 筆，保留其餘上傳結果\n按「取消」= 整批（含已成功的）重新排入佇列，稍後重新上傳整批（已成功寫入的會自動被判定重複而略過，不會重複寫入）`;
+
+      const excludeAnomalies = confirm(msg);
+      if(excludeAnomalies){
+        queue = [];
+      } else {
+        queue = currentQueue; // 整批放回佇列，交給重複判斷機制去避免真正重複寫入
+      }
+    } else {
+      alert(msg);
+      queue = [];
+    }
+
     renderQueue();
     renderStats();
     renderTrend();
   }catch(err){
-    alert('上傳失敗：'+ err.message);
+    alert('上傳中斷：'+ err.message + '\n\n已成功送出的批次不會受影響，可以重新整理頁面或再次點擊上傳處理剩餘檔案。');
   }finally{
     btn.textContent = original; btn.disabled = false;
   }
