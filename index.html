@@ -431,11 +431,11 @@ async function renderTrend(){
 }
 
 /* ---------- Excel 明細連結 ---------- */
-const SHEET_URL = 'https://docs.google.com/spreadsheets/d/1TxwaXwCaIQ-ivKNms6PJek4wCnV9dUOXktFTyK1ZKts/edit?gid=549650849#gid=549650849'; // 貼上你的 Google Sheet 網址（例如 https://docs.google.com/spreadsheets/d/xxxx/edit）
+const SHEET_URL = 'https://docs.google.com/spreadsheets/d/1TxwaXwCaIQ-ivKNms6PJek4wCnV9dUOXktFTyK1ZKts/edit?gid=549650849#gid=549650849';
 function openSheet(e){
   e.preventDefault();
   if(!SHEET_URL){ alert('尚未設定 Excel 表單網址，請在 index.html 的 SHEET_URL 填入 Google Sheet 連結'); return; }
-  window.open(SHEET_URL, '物流明細');
+  window.open(SHEET_URL, '_blank');
 }
 document.getElementById('open-sheet-btn').addEventListener('click', openSheet);
 document.getElementById('open-sheet-btn-top').addEventListener('click', openSheet);
