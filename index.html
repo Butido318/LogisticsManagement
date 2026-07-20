@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Logistics Analysis Dashboard 物流管理表</title>
+<title>Logistics Analysis Dashboard 物流分析表</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@600;700&family=Noto+Sans+TC:wght@400;500;700;900&family=IBM+Plex+Mono:wght@400;500;600&display=swap" rel="stylesheet">
 <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
@@ -105,12 +105,13 @@
   .grid-2{display:grid; grid-template-columns:1fr 1fr; gap:18px; margin-top:18px; align-items:start;}
   @media (max-width:900px){.grid-2{grid-template-columns:1fr;}}
 
-  .panel-head{display:flex; align-items:center; gap:8px; margin-bottom:16px; height:26px;}
+  .panel-head{display:flex; align-items:center; gap:8px; margin-bottom:16px; height:26px; overflow:hidden;}
   .panel-head .icon{
     width:26px; height:26px; border-radius:6px; display:flex; align-items:center; justify-content:center;
-    background:var(--blue-dim); color:var(--blue); font-size:14px; line-height:1; flex-shrink:0;
+    background:var(--blue-dim); color:var(--blue); flex-shrink:0; overflow:hidden;
   }
-  .panel-head h2{font-size:17px; font-weight:700; line-height:1; margin:0;}
+  .panel-head .icon-dot{width:9px; height:9px; border-radius:50%; background:var(--blue); display:block;}
+  .panel-head h2{font-size:17px; font-weight:700; line-height:26px; margin:0;}
 
   .filter-row{display:flex; gap:14px; flex-wrap:wrap; margin-bottom:18px;}
   .field{display:flex; flex-direction:column; gap:6px; flex:1; min-width:150px;}
@@ -195,7 +196,7 @@
   <div class="grid-2">
     <!-- 分析欄位1 -->
     <div class="card">
-      <div class="panel-head"><span class="icon"></span><h2>物流分佈統計</h2></div>
+      <div class="panel-head"><span class="icon"><span class="icon-dot"></span></span><h2>物流分佈統計</h2></div>
       <div class="filter-row">
         <div class="field"><label>開始日期</label><input type="date" id="stat-start"></div>
         <div class="field"><label>結束日期</label><input type="date" id="stat-end"></div>
@@ -208,7 +209,7 @@
 
     <!-- 分析欄位2 -->
     <div class="card">
-      <div class="panel-head"><span class="icon"></span><h2>營運趨勢分析</h2></div>
+      <div class="panel-head"><span class="icon"><span class="icon-dot"></span></span><h2>營運趨勢分析</h2></div>
       <div class="filter-row">
         <div class="field">
           <label>時間單位</label>
@@ -453,7 +454,6 @@ function openSheet(e){
   if(!SHEET_URL){ alert('尚未設定 Excel 表單網址，請在 index.html 的 SHEET_URL 填入 Google Sheet 連結'); return; }
   window.open(SHEET_URL, '_blank');
 }
-document.getElementById('open-sheet-btn').addEventListener('click', openSheet);
 document.getElementById('open-sheet-btn-top').addEventListener('click', openSheet);
 
 /* ---------- 上傳佇列（拖曳 / 選擇檔案） ---------- */
