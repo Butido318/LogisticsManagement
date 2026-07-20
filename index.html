@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Logistics Analysis Dashboard 物流分析表</title>
+<title>Logistics Analysis Dashboard 物流管理表</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@600;700&family=Noto+Sans+TC:wght@400;500;700;900&family=IBM+Plex+Mono:wght@400;500;600&display=swap" rel="stylesheet">
 <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
@@ -102,15 +102,15 @@
   .btn.small{padding:8px 14px; font-size:14px; background:var(--blue-dim); color:var(--blue); font-weight:500;}
 
   /* two-column analysis */
-  .grid-2{display:grid; grid-template-columns:1fr 1fr; gap:18px; margin-top:18px;}
+  .grid-2{display:grid; grid-template-columns:1fr 1fr; gap:18px; margin-top:18px; align-items:start;}
   @media (max-width:900px){.grid-2{grid-template-columns:1fr;}}
 
-  .panel-head{display:flex; align-items:center; gap:8px; margin-bottom:16px;}
+  .panel-head{display:flex; align-items:center; gap:8px; margin-bottom:16px; height:26px;}
   .panel-head .icon{
     width:26px; height:26px; border-radius:6px; display:flex; align-items:center; justify-content:center;
-    background:var(--blue-dim); color:var(--blue); font-size:14px; flex-shrink:0;
+    background:var(--blue-dim); color:var(--blue); font-size:14px; line-height:1; flex-shrink:0;
   }
-  .panel-head h2{font-size:17px; font-weight:700;}
+  .panel-head h2{font-size:17px; font-weight:700; line-height:1; margin:0;}
 
   .filter-row{display:flex; gap:14px; flex-wrap:wrap; margin-bottom:18px;}
   .field{display:flex; flex-direction:column; gap:6px; flex:1; min-width:150px;}
