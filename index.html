@@ -131,7 +131,7 @@
 
   .range-label{font-size:14px; color:var(--text-muted); margin:-6px 0 14px;}
 
-  canvas{max-width:100%;}
+  canvas{max-width:100%; height:260px !important; display:block;}
 
   .table-wrap{overflow-x:auto; -webkit-overflow-scrolling:touch;}
   table{width:100%; min-width:640px; border-collapse:collapse; font-size:14px;}
@@ -161,6 +161,7 @@
     .upload-actions{flex-direction:column;}
     .upload-actions .btn{width:100%;}
     .dropzone{padding:24px 12px;}
+    canvas{height:220px !important;}
   }
   @media (max-width:380px){
     :root{ --gutter: 10px; }
@@ -200,7 +201,7 @@
       </div>
       <div class="stat-row" id="stat-grid"></div>
       <p class="range-label" id="stat-range-label"></p>
-      <canvas id="statChart" height="180"></canvas>
+      <canvas id="statChart"></canvas>
     </div>
 
     <!-- 分析欄位2 -->
@@ -239,7 +240,7 @@
         <div class="field"><label>&nbsp;</label><button class="btn blue" onclick="renderTrend()">套用篩選</button></div>
       </div>
       <p class="range-label" id="trend-range-label-text"></p>
-      <canvas id="trendChart" height="180"></canvas>
+      <canvas id="trendChart"></canvas>
     </div>
   </div>
 
@@ -340,12 +341,13 @@ async function renderStats(){
     data:{ labels: CARRIERS.map(c=>c.name), datasets:[{ data: totals, backgroundColor: CARRIERS.map(c=>c.color), borderRadius:6, maxBarThickness:52 }] },
     options:{
       responsive:true,
+      maintainAspectRatio:false,
       plugins:{
         legend:{display:false},
         tooltip:{enabled:false},
-        datalabels:{ anchor:'end', align:'top', color:'#7A8494', font:{size:12.5, family:"'IBM Plex Mono'"}, formatter:v=>v+'件' }
+        datalabels:{ anchor:'end', align:'top', offset:6, color:'#4B5563', font:{size:13, weight:'600', family:"'IBM Plex Mono'"}, formatter:v=>v+'件' }
       },
-      layout:{padding:{top:16}},
+      layout:{padding:{top:28}},
       scales:{
         x:{ grid:{display:false}, ticks:{color:'#4B5563', font:{family:"'Noto Sans TC'", size:13}} },
         y:{ display:false, grid:{display:false} }
@@ -434,12 +436,13 @@ async function renderTrend(){
     data:{ labels, datasets:[{ data: values, borderColor:color, backgroundColor:color+'14', pointBackgroundColor:'#fff', pointBorderColor:color, pointBorderWidth:2, pointRadius:4, tension:.35, borderWidth:2.5, fill:true }] },
     options:{
       responsive:true,
+      maintainAspectRatio:false,
       plugins:{
         legend:{display:false},
         tooltip:{enabled:false},
-        datalabels:{ anchor:'end', align:'top', color:'#7A8494', font:{size:12.5, family:"'IBM Plex Mono'"}, formatter:v=>v }
+        datalabels:{ anchor:'end', align:'top', offset:6, color:'#4B5563', font:{size:13, weight:'600', family:"'IBM Plex Mono'"}, formatter:v=>v }
       },
-      layout:{padding:{top:16}},
+      layout:{padding:{top:28}},
       scales:{
         x:{ grid:{display:false}, ticks:{color:'#7A8494', maxRotation:0, autoSkip:true, font:{family:"'IBM Plex Mono'", size:12}} },
         y:{ display:false, grid:{display:false} }
