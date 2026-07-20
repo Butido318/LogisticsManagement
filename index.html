@@ -183,14 +183,14 @@
 
   <div class="card upload-card">
     <div class="dropzone" id="dropzone">
-      <div class="headline">＋ 將物流 PDF 面單拖曳至此，或點擊選擇檔案</div>
-      <div class="sub">可一次選擇多個檔案，系統會先依檔名猜測物流商，上傳前可手動修正</div>
+      <div class="headline">＋ 將物流PDF面單拖曳至此，或點擊選擇檔案</div>
+      <div class="sub">可一次選擇多個檔案，系統會訂單編號排序</div>
       <input type="file" id="file-input" accept="application/pdf" multiple hidden>
     </div>
     <div id="queue-list" style="text-align:left; margin-top:14px;"></div>
     <div class="upload-actions">
       <button class="btn blue" id="parse-btn" onclick="startUpload()">開始解析上傳</button>
-      <a href="#" id="open-sheet-btn-top" class="btn green-outline"><span class="dot"></span>前往查看 Excel 明細</a>
+      <a href="#" id="open-sheet-btn-top" class="btn green-outline"><span class="dot"></span>前往查看Excel明細</a>
     </div>
   </div>
 
@@ -249,7 +249,7 @@
 
 </main>
 
-<footer>Prototype demo · 資料為示範用假資料，尚未串接 Apps Script / Google Sheets 後端</footer>
+<footer>圖表為Excel明細資料</footer>
 
 <script>
 Chart.register(ChartDataLabels);
