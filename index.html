@@ -185,8 +185,8 @@
   <div class="card upload-card">
     <div class="dropzone" id="dropzone">
       <div class="headline">＋ 將物流PDF面單拖曳至此，或點擊選擇檔案</div>
-      <div class="sub">可一次選擇多個檔案，系統會訂單編號排序</div>
-      <input type="file" id="file-input" accept="application/pdf" multiple hidden>
+      <div class="sub">可一次選擇多個檔案，系統會訂單編號排序（支援 PDF 與 ZIP，ZIP 會自動解壓縮）</div>
+      <input type="file" id="file-input" accept="application/pdf,.zip,application/zip" multiple hidden>
     </div>
     <div id="queue-list" style="text-align:left; margin-top:14px;"></div>
     <div class="upload-actions">
@@ -462,14 +462,18 @@ document.getElementById('open-sheet-btn-top').addEventListener('click', openShee
 
 const QUEUE_LIST_THRESHOLD = 20; // 檔案數在這個數字以下才逐筆列出，超過只顯示總數摘要（2000 筆逐筆渲染會很卡）
 
-let queue = []; // {id, file}
+let queue = []; // {id, file, kind: 'pdf'|'zip'}
 let seq = 0;
 
 function addFiles(fileList){
   Array.from(fileList).forEach(file=>{
-    if(!file.name.toLowerCase().endsWith('.pdf')) return;
-    // 物流商一律「自動判斷」，交給後端依 PDF 實際內容判斷（不用檔名猜，不會被誤判的檔名誤導）
-    queue.push({ id: seq++, file });
+    const name = file.name.toLowerCase();
+    let kind = null;
+    if(name.endsWith('.pdf')) kind = 'pdf';
+    else if(name.endsWith('.zip')) kind = 'zip';
+    if(!kind) return; // 其他檔案類型忽略
+    // 物流商一律「自動判斷」，交給後端依內容判斷（PDF 直接判斷；ZIP 會先解壓縮，裡面每個 PDF 各自判斷）
+    queue.push({ id: seq++, file, kind });
   });
   renderQueue();
 }
@@ -479,9 +483,11 @@ function renderQueue(){
   if(queue.length === 0){ el.innerHTML = ''; return; }
 
   if(queue.length > QUEUE_LIST_THRESHOLD){
+    const pdfCount = queue.filter(q=>q.kind==='pdf').length;
+    const zipCount = queue.filter(q=>q.kind==='zip').length;
     el.innerHTML = `
       <div class="queue-row">
-        <span class="fname">已加入 <b>${queue.length}</b> 個檔案（物流商將依 PDF 內容自動判斷，數量較多不逐筆列出）</span>
+        <span class="fname">已加入 <b>${queue.length}</b> 個檔案（PDF ${pdfCount} 個、ZIP ${zipCount} 個；物流商將依內容自動判斷，數量較多不逐筆列出）</span>
         <button class="remove" onclick="clearQueue()" style="font-size:13px;">清空全部</button>
       </div>`;
     return;
@@ -489,7 +495,7 @@ function renderQueue(){
 
   el.innerHTML = queue.map(q=>`
     <div class="queue-row" data-id="${q.id}">
-      <span class="fname mono">${q.file.name}</span>
+      <span class="fname mono">${q.kind==='zip'?'📦 ':''}${q.file.name}</span>
       <span class="status" id="qstatus-${q.id}">待上傳</span>
       <button class="remove" onclick="removeQueue(${q.id})">✕</button>
     </div>`).join('');
@@ -537,11 +543,12 @@ async function startUpload(){
       btn.textContent = `解析上傳中...（${Math.min((c+1)*BATCH_SIZE, currentQueue.length)}/${currentQueue.length}）`;
       chunk.forEach(q=> { const el = document.getElementById('qstatus-'+q.id); if(el) el.textContent = '處理中'; });
 
-      const items = await Promise.all(chunk.map(async q=>({
-        carrierType: 'auto',
-        filename: q.file.name,
-        pdfBase64: await fileToBase64_(q.file)
-      })));
+      const items = await Promise.all(chunk.map(async q=>{
+        const base64 = await fileToBase64_(q.file);
+        const item = { carrierType: 'auto', filename: q.file.name };
+        item[q.kind === 'zip' ? 'zipBase64' : 'pdfBase64'] = base64;
+        return item;
+      }));
 
       const res = await fetch(API_URL, {
         method:'POST',
