@@ -8,6 +8,7 @@
 <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@600;700&family=Noto+Sans+TC:wght@400;500;700;900&family=IBM+Plex+Mono:wght@400;500;600&display=swap" rel="stylesheet">
 <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/chartjs-plugin-datalabels/2.2.0/chartjs-plugin-datalabels.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/pdf-lib/1.17.1/pdf-lib.min.js"></script>
 <style>
   :root{
     --gutter: clamp(14px, 4vw, 32px);
@@ -185,7 +186,7 @@
   <div class="card upload-card">
     <div class="dropzone" id="dropzone">
       <div class="headline">＋ 將物流PDF面單拖曳至此，或點擊選擇檔案</div>
-      <div class="sub">可一次選擇多個檔案，系統會訂單編號排序</div>
+      <div class="sub">PDF可以一張或一份多頁的資料上傳，較大的檔案會自動先拆成小份再送出</div>
       <input type="file" id="file-input" accept="application/pdf" multiple hidden>
     </div>
     <div id="queue-list" style="text-align:left; margin-top:14px;"></div>
@@ -508,19 +509,50 @@ document.getElementById('open-sheet-btn-top').addEventListener('click', openShee
 
 const QUEUE_LIST_THRESHOLD = 20; // 檔案數在這個數字以下才逐筆列出，超過只顯示總數摘要（2000 筆逐筆渲染會很卡）
 
-let queue = []; // {id, file, kind: 'pdf'|'zip'}
+let queue = []; // {id, file, kind:'pdf', pageCount, label}
 let seq = 0;
 
-function addFiles(fileList){
-  Array.from(fileList).forEach(file=>{
-    const name = file.name.toLowerCase();
-    let kind = null;
-    if(name.endsWith('.pdf')) kind = 'pdf';
-    else if(name.endsWith('.zip')) kind = 'zip';
-    if(!kind) return; // 其他檔案類型忽略
-    // 物流商一律「自動判斷」，交給後端依內容判斷（PDF 直接判斷；ZIP 會先解壓縮，裡面每個 PDF 各自判斷）
-    queue.push({ id: seq++, file, kind });
-  });
+const MAX_PAGES_PER_CHUNK = 20; // 單次 OCR 轉檔頁數上限，超過就先在瀏覽器端拆開，避免後端單次執行超過 Apps Script 6 分鐘限制
+
+// 把一個 File 物件包成一個新的、只含指定頁碼範圍的 PDF File（用 pdf-lib 在瀏覽器端處理，不用送到後端）
+async function splitPdfFile_(file, maxPages){
+  const bytes = await file.arrayBuffer();
+  const srcDoc = await PDFLib.PDFDocument.load(bytes, { ignoreEncryption: true });
+  const totalPages = srcDoc.getPageCount();
+  if(totalPages <= maxPages) return [{ file, pageCount: totalPages, label: file.name }];
+
+  const chunks = [];
+  const totalChunks = Math.ceil(totalPages / maxPages);
+  for(let c=0; c<totalChunks; c++){
+    const start = c*maxPages;
+    const end = Math.min(start+maxPages, totalPages);
+    const newDoc = await PDFLib.PDFDocument.create();
+    const indices = Array.from({length: end-start}, (_,i)=> start+i);
+    const copiedPages = await newDoc.copyPages(srcDoc, indices);
+    copiedPages.forEach(p=> newDoc.addPage(p));
+    const newBytes = await newDoc.save();
+    const partName = file.name.replace(/\.pdf$/i, '') + `_第${c+1}份.pdf`;
+    const newFile = new File([newBytes], partName, { type: 'application/pdf' });
+    chunks.push({ file: newFile, pageCount: end-start, label: `${file.name}（第${c+1}/${totalChunks}份，共${totalPages}頁）` });
+  }
+  return chunks;
+}
+
+async function addFiles(fileList){
+  const files = Array.from(fileList).filter(f=> f.name.toLowerCase().endsWith('.pdf'));
+  if(!files.length) return;
+
+  for(const file of files){
+    try{
+      const parts = await splitPdfFile_(file, MAX_PAGES_PER_CHUNK);
+      parts.forEach(p=>{
+        queue.push({ id: seq++, file: p.file, kind: 'pdf', pageCount: p.pageCount, label: p.label });
+      });
+    }catch(err){
+      // 拆分失敗（例如檔案損毀），仍然把原始檔案加入佇列，讓後端照樣試著處理，只是不知道正確頁數就不做頁數比對
+      queue.push({ id: seq++, file, kind: 'pdf', pageCount: null, label: file.name + '（無法預先判斷頁數）' });
+    }
+  }
   renderQueue();
 }
 
@@ -529,11 +561,9 @@ function renderQueue(){
   if(queue.length === 0){ el.innerHTML = ''; return; }
 
   if(queue.length > QUEUE_LIST_THRESHOLD){
-    const pdfCount = queue.filter(q=>q.kind==='pdf').length;
-    const zipCount = queue.filter(q=>q.kind==='zip').length;
     el.innerHTML = `
       <div class="queue-row">
-        <span class="fname">已加入 <b>${queue.length}</b> 個檔案（PDF ${pdfCount} 個、ZIP ${zipCount} 個；物流商將依內容自動判斷，數量較多不逐筆列出）</span>
+        <span class="fname">已加入 <b>${queue.length}</b> 個檔案（含自動拆分後的份數；物流商將依內容自動判斷，數量較多不逐筆列出）</span>
         <button class="remove" onclick="clearQueue()" style="font-size:13px;">清空全部</button>
       </div>`;
     return;
@@ -541,7 +571,7 @@ function renderQueue(){
 
   el.innerHTML = queue.map(q=>`
     <div class="queue-row" data-id="${q.id}">
-      <span class="fname mono">${q.kind==='zip'?'📦 ':''}${q.file.name}</span>
+      <span class="fname mono">${q.label || q.file.name}</span>
       <span class="status" id="qstatus-${q.id}">待上傳</span>
       <button class="remove" onclick="removeQueue(${q.id})">✕</button>
     </div>`).join('');
@@ -566,7 +596,7 @@ function fileToBase64_(file){
   });
 }
 
-const BATCH_SIZE = 15; // 每次送給後端的檔案數；因為加了 OCR 流量限制的重試機制，單筆處理時間變長，調低批次數以確保不超過 Apps Script 6 分鐘限制
+const BATCH_SIZE = 5; // 每次送給後端的檔案數；現在每個檔案最多可能有 20 頁需要 OCR，調低批次數以確保不超過 Apps Script 6 分鐘限制
 
 async function startUpload(){
   if(!API_URL){ alert('尚未設定後端網址（API_URL），請先部署 Apps Script 並填入網址'); return; }
@@ -578,7 +608,7 @@ async function startUpload(){
   const currentQueue = queue;
   currentQueue.forEach(q=> { const el = document.getElementById('qstatus-'+q.id); if(el) el.textContent = '排隊中'; });
 
-  const totals = { inserted:0, duplicateCount:0, duplicates:[], needsReview:[], failed:[] };
+  const totals = { inserted:0, duplicateCount:0, duplicates:[], needsReview:[], failed:[], warnings:[] };
   const sortedQueue = [...currentQueue].sort((a,b)=> a.file.name.localeCompare(b.file.name));
   const chunks = [];
   for(let i=0;i<sortedQueue.length;i+=BATCH_SIZE) chunks.push(sortedQueue.slice(i,i+BATCH_SIZE));
@@ -591,7 +621,7 @@ async function startUpload(){
 
       const items = await Promise.all(chunk.map(async q=>{
         const base64 = await fileToBase64_(q.file);
-        const item = { carrierType: 'auto', filename: q.file.name };
+        const item = { carrierType: 'auto', filename: q.file.name, pageCount: q.pageCount || undefined };
         item[q.kind === 'zip' ? 'zipBase64' : 'pdfBase64'] = base64;
         return item;
       }));
@@ -609,6 +639,7 @@ async function startUpload(){
       totals.duplicates.push(...(data.duplicates?.first5 || []), ...(data.duplicates?.last5 || []));
       totals.needsReview.push(...(data.needsReview || []));
       totals.failed.push(...(data.failed || []));
+      totals.warnings.push(...(data.warnings || []));
     }
 
     let msg = `全部上傳完成：新增 ${totals.inserted} 筆`;
@@ -618,6 +649,10 @@ async function startUpload(){
       if(dupSorted.length>5){
         msg += `\n\n重複訂單編號（末5筆）：\n${dupSorted.slice(-5).join('\n')}`;
       }
+    }
+
+    if(totals.warnings.length){
+      msg += `\n\n🔍 ${totals.warnings.length} 份檔案頁數對不上，建議人工複查：\n${totals.warnings.slice(0,5).map(w=>`${w.filename.slice(0,20)}：${w.reason}`).join('\n')}`;
     }
 
     const anomalies = [...totals.needsReview, ...totals.failed]; // 無法判斷物流商 + 其他解析失敗，合併當作「異常」處理
