@@ -517,11 +517,13 @@ let seq = 0;
 const MAX_PAGES_PER_CHUNK = 40; // 單次 OCR 轉檔頁數上限，超過就先在瀏覽器端拆開。原本設 20，但發現瀏覽器端拆分品質不穩定（拆完只剩前幾頁能讀到），先調高減少拆分次數，同時修正下面的存檔方式
 
 // 把一個 File 物件包成一個新的、只含指定頁碼範圍的 PDF File（用 pdf-lib 在瀏覽器端處理，不用送到後端）
+const ENABLE_CLIENT_SPLIT = false; // 關閉瀏覽器端拆分：實測發現用 pdf-lib 重新存檔切分，大部分頁面內容會不見（不拆分反而成功率高很多），先關掉改整份送出
+
 async function splitPdfFile_(file, maxPages){
   const bytes = await file.arrayBuffer();
   const srcDoc = await PDFLib.PDFDocument.load(bytes, { ignoreEncryption: true });
   const totalPages = srcDoc.getPageCount();
-  if(totalPages <= maxPages) return [{ file, pageCount: totalPages, label: file.name }];
+  if(!ENABLE_CLIENT_SPLIT || totalPages <= maxPages) return [{ file, pageCount: totalPages, label: file.name }];
 
   const chunks = [];
   const totalChunks = Math.ceil(totalPages / maxPages);
@@ -598,7 +600,7 @@ function fileToBase64_(file){
   });
 }
 
-const BATCH_SIZE = 5; // 每次送給後端的檔案數；現在每個檔案最多可能有 20 頁需要 OCR，調低批次數以確保不超過 Apps Script 6 分鐘限制
+const BATCH_SIZE = ENABLE_CLIENT_SPLIT ? 5 : 1; // 沒有先拆分的話，一個檔案可能就很大，一次只送一個檔案，讓它獨享整個 6 分鐘執行時間
 
 async function startUpload(){
   if(!API_URL){ alert('尚未設定後端網址（API_URL），請先部署 Apps Script 並填入網址'); return; }
