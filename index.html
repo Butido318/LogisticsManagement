@@ -123,7 +123,7 @@
     padding:10px 10px; border-radius:7px; font-family:'Noto Sans TC',sans-serif; font-size:15px;
   }
 
-  .stat-row{display:grid; grid-template-columns:repeat(6,1fr); gap:10px; margin-bottom:18px;}
+  .stat-row{display:grid; grid-template-columns:repeat(auto-fit, minmax(85px, 1fr)); gap:10px; margin-bottom:18px;}
   @media (max-width:520px){.stat-row{grid-template-columns:repeat(3,1fr);}}
   .stat{
     background:#FAFBFC; border:1px solid var(--border); border-radius:10px; padding:12px 6px;
@@ -247,6 +247,7 @@
             <option value="shopee">店到家</option>
             <option value="hct">HCT</option>
             <option value="standard">標準配送</option>
+            <option value="kerry">嘉里快遞</option>
           </select>
         </div>
         <div class="field"><label>&nbsp;</label><button class="btn blue" onclick="renderTrend()">套用篩選</button></div>
@@ -288,6 +289,7 @@ const CARRIERS = [
   {key:'shopee',   name:'店到家',   color:'#F08A34'},
   {key:'hct',      name:'HCT',      color:'#F0C24A'},
   {key:'standard', name:'標準配送', color:'#9B59D0'},
+  {key:'kerry',    name:'嘉里快遞', color:'#14B8A6'},
 ];
 
 /* ---------- mock data helpers ---------- */
@@ -644,25 +646,35 @@ async function startUpload(){
 
     let msg = `全部上傳完成：新增 ${totals.inserted} 筆`;
     if(totals.duplicateCount > 0){
-      const dupSorted = totals.duplicates;
-      msg += `，重複略過 ${totals.duplicateCount} 筆\n\n重複訂單編號（前5筆）：\n${dupSorted.slice(0,5).join('\n')}`;
-      if(dupSorted.length>5){
-        msg += `\n\n重複訂單編號（末5筆）：\n${dupSorted.slice(-5).join('\n')}`;
-      }
+      msg += `，重複略過 ${totals.duplicateCount} 筆（訂單編號已存在，不重複列出）`;
+    }
+
+    // 把警示/異常訊息依「問題類型」歸類，同一種問題只描述一次，底下列出檔名（依字母排序），比較省版面
+    function normalizeReason_(reason){
+      if(/頁數.*但只拆出|可能有頁面因為關鍵字/.test(reason)) return '瀏覽器偵測頁數跟拆出張數不符，可能有面單被誤合併，建議人工複查';
+      if(/無法自動判斷物流商/.test(reason)) return '無法自動判斷物流商，請手動指定';
+      if(/抓不到任何文字內容/.test(reason)) return 'PDF 抓不到文字內容（可能是圖片型 PDF，OCR 也沒抓到）';
+      return reason;
+    }
+    function groupByReason_(list){
+      const groups = {};
+      list.forEach(item=>{
+        const key = normalizeReason_(item.reason || '未知原因');
+        (groups[key] = groups[key] || []).push(item.filename);
+      });
+      return Object.entries(groups).map(([reason, names])=>{
+        names.sort((a,b)=>a.localeCompare(b));
+        return `【${reason}】共 ${names.length} 筆\n${names.join('、')}`;
+      });
     }
 
     if(totals.warnings.length){
-      msg += `\n\n🔍 ${totals.warnings.length} 份檔案頁數對不上，建議人工複查：\n${totals.warnings.slice(0,5).map(w=>`${w.filename.slice(0,20)}：${w.reason}`).join('\n')}`;
+      msg += `\n\n🔍 需人工複查（共 ${totals.warnings.length} 筆）：\n` + groupByReason_(totals.warnings).join('\n\n');
     }
 
     const anomalies = [...totals.needsReview, ...totals.failed]; // 無法判斷物流商 + 其他解析失敗，合併當作「異常」處理
     if(anomalies.length){
-      const truncName = f => f.slice(0,14);
-      const fmt = r => `${truncName(r.filename)}：${r.reason || '未知原因'}`;
-      const first5 = anomalies.slice(0,5).map(fmt);
-      const last5 = anomalies.length>5 ? anomalies.slice(-5).map(fmt) : [];
-      msg += `\n\n⚠️ ${anomalies.length} 筆無法判斷物流商或解析失敗\n前5筆檔名：\n${first5.join('\n')}`;
-      if(last5.length) msg += `\n末5筆檔名：\n${last5.join('\n')}`;
+      msg += `\n\n⚠️ 異常（共 ${anomalies.length} 筆）：\n` + groupByReason_(anomalies).join('\n\n');
 
       const excludeAnomalies = await showSummaryModal_(msg, {
         confirmLabel: `排除異常 ${anomalies.length} 筆`,
